@@ -8,6 +8,7 @@ AK_LINK=${AK_LINK:-0}
 AK_STAMP=$(date +%Y%m%d-%H%M%S)
 MANIFEST=.agentkit-manifest
 
+# shellcheck disable=SC2034  # colour vars are also used by agentkit.sh
 if [[ -t 1 ]]; then C_G=$'\033[32m' C_Y=$'\033[33m' C_R=$'\033[31m' C_D=$'\033[2m' C_B=$'\033[1m' C_0=$'\033[0m'
 else C_G='' C_Y='' C_R='' C_D='' C_B='' C_0=''; fi
 

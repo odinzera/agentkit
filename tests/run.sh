@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # End-to-end tests for agentkit: every run uses a throwaway HOME, never the real one.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 AK=./agentkit.sh
 pass=0 fail=0
 
@@ -15,6 +15,7 @@ check() { local name=$1; shift; if "$@" >/dev/null 2>&1; then ok "$name"; else b
 has()  { grep -q -- "$2" "$1"; }
 q()    { "$AK" "$@" -c /dev/null >/dev/null 2>&1; }   # -c /dev/null: ignore the repo's agentkit.conf
 # pen-tester is on-demand only: no workflow may list it as a step or a team member
+# shellcheck disable=SC2016  # backticks are literal markdown, not command substitution
 no_pentester_delegation() { ! grep -qE '^[[:space:]]*[0-9]+\. \*\*pen-tester|^\| `pen-tester`' "$1"/*.md; }
 
 echo "catalog"

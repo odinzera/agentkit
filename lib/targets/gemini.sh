@@ -23,7 +23,7 @@ gemini_workflow() {
     echo
     # literal multi-line string: no escape processing, so backslashes in prompts survive
     echo "prompt = '''"
-    fm_body "$f" | sed -e 's/\$ARGUMENTS/{{args}}/g' -e "s/'''/' ' '/g"
+    fm_body "$f" | sed -e "s/\\\$ARGUMENTS/{{args}}/g" -e "s/'''/' ' '/g"
     echo "'''"
   } | install_stream "$ROOT" "commands/$name.toml"
 }

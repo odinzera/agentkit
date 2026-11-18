@@ -91,6 +91,7 @@ done
 
 AK_SCOPE=$SCOPE
 AK_LINK=$LINK_SKILLS
+# shellcheck disable=SC2034  # read by the sourced lib/targets/*.sh adapters
 AK_PROJECT=$(cd "${PROJECT_DIR:-$PWD}" 2>/dev/null && pwd) || die "project dir not found: $PROJECT_DIR"
 [[ $TARGETS == all ]] && TARGETS=$(available_targets | paste -sd' ')
 TARGET_LIST=$(split_list "$TARGETS")
@@ -204,7 +205,8 @@ cmd_validate() {
     done < <(items "$kind")
   done
   local w; for w in "${warns[@]}"; do warn "$w"; done
-  ((errs == 0)) && info "catalog OK${warns[*]:+ (with ${#warns[@]} warning(s))}" || die "$errs problem(s) found"
+  if ((errs > 0)); then die "$errs problem(s) found"; fi
+  info "catalog OK${warns[*]:+ (with ${#warns[@]} warning(s))}"
 }
 
 cmd_new() {
