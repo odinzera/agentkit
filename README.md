@@ -1,133 +1,140 @@
 # agentkit
 
-One catalog of **skills**, **agents** and **workflows**, installed into Claude Code, OpenCode, Codex CLI (or any tool you add an adapter for) by a single shell script.
+One catalog of **skills**, **agents** and **workflows**, installed into Claude Code, OpenCode, Codex CLI and Gemini CLI (or any tool you add an adapter for) by a single shell script.
 
 ```
-./agentkit.sh configure          # pick targets/scope interactively (writes agentkit.conf)
-./agentkit.sh install -n         # dry run
-./agentkit.sh install            # install everything per agentkit.conf
+  DEFINE        PLAN          BUILD         VERIFY        REVIEW        SHIP
+ ┌───────┐    ┌───────┐    ┌───────┐    ┌───────┐    ┌───────┐    ┌───────┐
+ │ Spec  │ ─▶ │ Tasks │ ─▶ │ Code  │ ─▶ │ Tests │ ─▶ │ Diff  │ ─▶ │GO/NOGO│
+ └───────┘    └───────┘    └───────┘    └───────┘    └───────┘    └───────┘
+  /spec        /plan        /build    (inside /build)  /ship  (parallel review)
+
+  …or hand the whole thing to /master <task>
+```
+
+```
+./agentkit.sh install -n         # dry run with agentkit.conf defaults
+./agentkit.sh install            # install
 ./agentkit.sh status             # what's installed where
 ./agentkit.sh uninstall          # removes only what agentkit installed
+./agentkit.sh configure          # pick targets/scope interactively
 ```
 
-## Layout
+## What's in the catalog
 
-```
-agentkit.sh            CLI
-agentkit.conf          defaults (flags override)
-lib/common.sh          frontmatter parsing, manifest, safe file placement
-lib/targets/*.sh       one adapter per tool
-catalog/
-  skills/<name>/SKILL.md     + any supporting files
-  agents/<name>.md
-  workflows/<name>.md
-```
+**Workflows** (slash commands you trigger; Claude Code won't start them by itself)
+
+| Command | Phase | What it does |
+|---|---|---|
+| `/spec <idea>` | define | Asks clarifying questions one at a time, writes `SPEC.md` with testable acceptance criteria |
+| `/plan` | plan | Breaks the spec into small vertical tasks in `tasks/plan.md`, each with a "done when" check |
+| `/build` · `/build auto` | build + verify | Next task test-first (red → green → full suite → one commit). `auto` runs every task after a single approval and stops on anything risky |
+| `/ship [range]` | review + ship | Runs code-reviewer, test-runner and a test-gap analysis **in parallel**, merges them into GO / NO-GO with a rollback plan |
+| `/master <task>` | all | Orchestrator: triage → recon → plan → build → verify → review, delegating each phase |
+| `/feature`, `/bugfix` | shortcuts | Lighter single-pass versions for everyday work |
+| `/release-notes` | ship | Drafts user-facing notes from git history |
+
+**Agents**
+
+| Agent | Role |
+|---|---|
+| `explorer` | read-only search and code mapping |
+| `code-writer` | writes production code |
+| `test-writer` | writes new tests and failing regression tests (test files only); analysis-only mode for `/ship` |
+| `test-runner` | runs the existing suite and fixes broken tests |
+| `code-reviewer` | severity-ranked review of a diff (read-only) |
+| `pen-tester` | **on demand only.** Security audit plus safe confirmation against local or authorized targets. No workflow uses it; ask for it directly ("use the pen-tester on the auth module", or `@pen-tester` in OpenCode) |
+
+**Skills**: `commit-message`, `code-review-checklist`, `write-tests`, `definition-of-done`
+
+### Orchestration rules
+
+- **Only the main session (or a slash command) orchestrates.** Agents return reports; they never call each other. (Claude Code subagents can't start subagents anyway, which is why `/master` is a workflow.)
+- **Parallel only when independent.** Reviews of the same diff fan out in one turn. Red → green → verify stays sequential.
+- **Direct beats orchestrated.** "Review this file" goes straight to `code-reviewer`. Use `/master` when there are several phases.
 
 ## How items map to each tool
 
-| Catalog    | Claude Code                   | OpenCode                          | Codex CLI                          |
-|------------|-------------------------------|-----------------------------------|------------------------------------|
-| skills     | `~/.claude/skills/<n>/`       | `~/.config/opencode/skills/<n>/`  | `~/.codex/skills/<n>/`             |
-| agents     | `~/.claude/agents/<n>.md`     | `~/.config/opencode/agents/<n>.md` (subagent) | not supported, skipped |
-| workflows  | `~/.claude/commands/<n>.md` → `/n` | `~/.config/opencode/commands/<n>.md` → `/n` | `~/.codex/prompts/<n>.md` → `/prompts:n` (global only) |
+| Catalog | Claude Code | OpenCode | Codex CLI | Gemini CLI |
+|---|---|---|---|---|
+| skills | `~/.claude/skills/<n>/` | `~/.config/opencode/skills/<n>/` ¹ | `~/.codex/skills/<n>/` | `~/.gemini/skills/<n>/` |
+| agents | `~/.claude/agents/<n>.md` | `~/.config/opencode/agents/<n>.md` | skipped | skipped |
+| workflows | `~/.claude/commands/<n>.md` | `~/.config/opencode/commands/<n>.md` | `~/.codex/prompts/<n>.md` (global only) | `~/.gemini/commands/<n>.toml` |
 
-With `--project DIR` the roots become `DIR/.claude`, `DIR/.opencode` and `DIR/.codex`.
-`CLAUDE_CONFIG_DIR`, `XDG_CONFIG_HOME` and `CODEX_HOME` are respected.
+¹ OpenCode also reads `.claude/skills`, so when Claude is a target too, agentkit skips OpenCode's copy (and removes one left by an older install) so skills aren't loaded twice.
 
-## Catalog formats
+With `--project DIR` the roots become `DIR/.claude`, `DIR/.opencode`, `DIR/.codex`, `DIR/.gemini`. `CLAUDE_CONFIG_DIR`, `XDG_CONFIG_HOME`, `CODEX_HOME` and `GEMINI_HOME` are respected.
 
-**Skill**: the standard `SKILL.md` (works as-is in all three tools):
+## Writing catalog items
 
-```markdown
----
-name: commit-message          # must equal the directory name
-description: What it does and when to use it.
----
-Instructions...
+`./agentkit.sh new skill|agent|workflow <name>` scaffolds one. `./agentkit.sh validate` checks them.
+
+**Skill**: standard `SKILL.md`, portable as-is. Only the Agent Skills spec keys are allowed at the top level (`name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`). The description says what it does **and** "Use when …", since that line is all an agent sees before deciding to load it. Don't summarize the steps in it. Recommended body:
+
+```
+Overview · When to use (and when not) · Steps · Common rationalizations · Red flags · Verification
 ```
 
-**Agent**: written once with portable fields, rendered per tool:
+The *Common rationalizations* table (the excuse an agent uses to skip a step, and why it's wrong) and the *Red flags* list are what keep agents from quietly cutting corners.
 
-```markdown
+**Agent**: portable fields, rendered per tool:
+
+```yaml
 ---
 name: code-reviewer
 description: When the main agent should delegate to this.
 tools: read, grep, glob, bash     # read write edit bash grep glob webfetch websearch; omit = all
 claude_model: sonnet              # optional (alias: model)
 opencode_model: anthropic/claude-sonnet-5-5   # optional
-opencode_mode: subagent           # optional, default subagent
+opencode_mode: subagent           # optional: subagent (default) | primary | all
 ---
 System prompt...
 ```
 
-Claude gets `tools: Read, Grep, Glob, Bash`. OpenCode gets a `tools:` map that turns off everything not listed.
-
-**Workflow**: a multi-step prompt installed as a slash command. `$ARGUMENTS` is replaced by whatever follows the command.
-
-```markdown
----
-name: bugfix
-description: Shown in the command menu
-argument-hint: <bug description>
-opencode_agent: build             # optional
----
-Fix this bug: $ARGUMENTS
-1. ...
-```
-
-**Fields for any item:**
+**Workflow**: a prompt installed as a slash command. `$ARGUMENTS` is what follows the command (`{{args}}` on Gemini).
 
 ```yaml
-optional: true                    # skipped unless named with --with / --only (or WITH= in agentkit.conf)
-targets: opencode                 # only install into these targets
-opencode_primary_agent: true      # workflows only: also install as an OpenCode primary agent (Tab to switch)
+---
+name: build
+description: Shown in the command menu
+argument-hint: [auto]
+model_invocable: true             # optional: let Claude start it by itself (default: user-only)
+opencode_primary_agent: true      # optional: also an OpenCode primary agent (Tab to switch)
+opencode_agent: build             # optional: which OpenCode agent runs the command
+gemini_name: planning             # optional: different command name on Gemini (avoids built-ins)
+---
 ```
 
-## The team
-
-| Agent | Role |
-|---|---|
-| `explorer` | read-only search and mapping |
-| `code-writer` | writes production code |
-| `test-writer` | writes new tests and failing regression tests (test files only) |
-| `test-runner` | runs the existing suite and fixes broken tests |
-| `code-reviewer` | reviews the diff (read-only) |
-| `pen-tester` | **on demand only**: security audit and safe confirmation against local or authorized targets. Not used by `/master` or any workflow; ask for it directly ("use the pen-tester on the auth module", or `@pen-tester` in OpenCode) |
-
-**Master orchestrator.** `/master <task>` works out what kind of task it is and maps the relevant code. It plans, asking for your approval when the work is large or risky. It then hands each phase to the agents above, reviews the result at most 3 times, and reports.
-It's a workflow rather than an agent because Claude Code subagents can't start other subagents, so the orchestrator has to run in the main conversation.
-- Claude Code: `/master add rate limiting to the login endpoint`
-- OpenCode: `/master …`, or press Tab to switch to the `master` primary agent
-- Codex: `/prompts:master …` (no subagents there, so it runs every phase itself)
+**Any item:** `optional: true` (installed only via `--with name` / `WITH=`), `targets: claude,opencode` (install only there).
 
 ## Commands and options
 
 ```
-list | install | uninstall | status | validate | targets
-configure                      interactive config
-new <skill|agent|workflow> <name>   scaffold in the catalog
-import <path> [agent|workflow]      bring in an existing skill dir / agent / command file
+list | install | uninstall | status | validate | targets | configure
+new <skill|agent|workflow> <name>       import <path> [agent|workflow]
 
--t claude,opencode | all     -g global (default)    -p [DIR] project
--k skills,agents,workflows   -o only,these          -x exclude,these     -w with,optional
--l symlink skills            -f force               -n dry run      -c config file
+-t claude,opencode,codex,gemini | all   -g global (default)   -p [DIR] project
+-k skills,agents,workflows   -o only,these   -x exclude,these   -w with,optional
+-l symlink skills            -f force        -n dry run         -c config file
 ```
 
 ## Safety
 
-- Each target root gets a `.agentkit-manifest`. Uninstall and re-install only touch paths listed there.
-- Files you created yourself are **skipped** unless you pass `--force`. Then the original is moved to `<root>/.agentkit-backups/<timestamp>/` first. Uninstalling later removes agentkit's copy but leaves the backup, so restore it by hand if you want it back.
-- `--link` symlinks skills to the catalog, so edits show up without reinstalling. Agents and workflows are always rendered copies, so re-run `install` after editing them.
+- Each target root has a `.agentkit-manifest`; uninstall and reinstall only touch paths listed there.
+- Files you created yourself are skipped unless you pass `--force`; then the original is moved to `<root>/.agentkit-backups/<timestamp>/` first.
+- `--link` symlinks skills so catalog edits go live; agents and workflows are rendered, so re-run `install` after editing them.
 
-## Adding another tool
+## Development
 
-Create `lib/targets/<tool>.sh` defining four functions (see `codex.sh` for the smallest example):
-
-```bash
-<tool>_root()      # print the config root for $AK_SCOPE (global|project; project dir is $AK_PROJECT)
-<tool>_skill()     # $1 = skill dir,  $2 = name  -> install_dir "$ROOT" "rel/path" "$1"
-<tool>_agent()     # $1 = agent .md,  $2 = name  -> render | install_stream "$ROOT" "rel/path"
-<tool>_workflow()  # $1 = workflow .md, $2 = name
+```
+./agentkit.sh validate    # catalog lint
+./tests/run.sh            # end-to-end tests in throwaway HOME dirs
 ```
 
-It's then usable as `-t <tool>` and is included in `-t all`. Helpers: `fm_get FILE KEY`, `fm_body FILE`, `split_list`, `skip_once`.
+CI (`.github/workflows/ci.yml`) runs shellcheck, validate and the tests on every push.
+
+**Adding a tool:** create `lib/targets/<tool>.sh` with `<tool>_root`, `<tool>_skill`, `<tool>_agent` and `<tool>_workflow` (see `gemini.sh`). It's then available as `-t <tool>` and in `-t all`. Helpers: `fm_get FILE KEY`, `fm_body FILE`, `split_list`, `skip_once`, `install_dir`, `install_stream`.
+
+## Credits
+
+The lifecycle commands, skill anatomy (rationalizations / red flags / verification), definition of done and orchestration rules are inspired by [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) (MIT). All text here is original.

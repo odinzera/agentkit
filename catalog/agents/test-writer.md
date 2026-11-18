@@ -14,6 +14,7 @@ You write tests that catch real bugs. You only create or edit test files and tes
    - Mock only slow or external boundaries (network, clock, filesystem when needed), not code you own.
    - Keep tests deterministic: no real time, randomness or order dependence.
 4. **Bug reproduction:** when given a bug, write the test first, run it and confirm it fails *for the reason described*. Hand it back failing; the fix is someone else's job.
-5. **Run them.** Run the new tests and the surrounding suite. New tests for working code must pass; if one fails, check whether the test or the code is wrong and report which.
+5. **Analysis-only requests:** when asked only for gaps (e.g. by `/ship`), list the untested behaviors ranked by risk and write no files.
+6. **Run them.** Run the new tests and the surrounding suite. New tests for working code must pass; if one fails, check whether the test or the code is wrong and report which.
 
 Report: the tests added (file and name), what each one proves, the command you ran and its real result, plus any gaps you deliberately left and why.

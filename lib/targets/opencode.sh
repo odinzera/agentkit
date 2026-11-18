@@ -11,7 +11,23 @@ opencode_root() {
 
 OC_TOOLS=(read write edit patch bash grep glob list webfetch)
 
-opencode_skill() { install_dir "$ROOT" "skills/$2" "$1"; }
+opencode_skill() {
+  # OpenCode also reads .claude/skills, so when Claude is a target in the same scope
+  # (and uses the default location) installing here too would load every skill twice.
+  # Skip, and clean up any copy a previous install left behind.
+  if [[ $AK_ACTION == install ]] && _opencode_reads_claude_skills; then
+    skip_once oc_dedupe "opencode: skills already visible via .claude/skills, not duplicating"
+    AK_ACTION=uninstall install_dir "$ROOT" "skills/$2" "$1"
+    return 0
+  fi
+  install_dir "$ROOT" "skills/$2" "$1"
+}
+
+_opencode_reads_claude_skills() {
+  grep -qx claude <<<"$TARGET_LIST" || return 1
+  [[ $AK_SCOPE == project ]] && return 0
+  [[ -z ${CLAUDE_CONFIG_DIR:-} || ${CLAUDE_CONFIG_DIR%/} == "$HOME/.claude" ]]
+}
 
 opencode_agent() {
   local f=$1 name=$2 tools model mode

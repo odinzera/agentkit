@@ -42,6 +42,9 @@ claude_workflow() {
     echo "---"
     echo "description: $(fm_get "$f" description)"
     [[ -n $hint ]] && echo "argument-hint: $hint"
+    # Workflows are user-triggered: stop Claude from launching them on its own
+    # unless the item opts in with model_invocable: true.
+    [[ $(fm_unquote "$(fm_get "$f" model_invocable)") == true ]] || echo "disable-model-invocation: true"
     echo "---"
     fm_body "$f"
   } | install_stream "$ROOT" "commands/$name.md"

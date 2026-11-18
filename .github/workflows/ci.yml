@@ -1,0 +1,13 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck -x agentkit.sh lib/*.sh lib/targets/*.sh tests/run.sh
+      - name: validate catalog
+        run: ./agentkit.sh validate
+      - name: tests
+        run: ./tests/run.sh

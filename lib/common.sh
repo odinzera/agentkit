@@ -22,7 +22,10 @@ fm_get() {
   awk -v k="$2" '
     NR==1 { if ($0 !~ /^---[[:space:]]*$/) exit; next }
     /^---[[:space:]]*$/ { exit }
-    index($0, k ":") == 1 { v = substr($0, length(k) + 2); sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v); print v; exit }
+    index($0, k ":") == 1 {
+      v = substr($0, length(k) + 2); sub(/^[ \t]+/, "", v)
+      if (v !~ /^["\x27]/) sub(/[ \t]+#.*$/, "", v)   # strip inline "# comment" on unquoted values
+      sub(/[ \t]+$/, "", v); print v; exit }
   ' "$1"
 }
 fm_unquote() { local v=$1; v=${v#\"}; v=${v%\"}; v=${v#\'}; v=${v%\'}; printf '%s' "$v"; }

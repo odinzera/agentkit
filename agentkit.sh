@@ -177,7 +177,7 @@ cmd_list() {
 }
 
 cmd_validate() {
-  local kind name path f errs=0
+  local kind name path f errs=0 seen="" warns=()
   for kind in "${KIND_DIRS[@]}"; do
     while IFS=$'\t' read -r name path; do
       f=$path; [[ $kind == skills ]] && f=$path/SKILL.md
@@ -185,15 +185,26 @@ cmd_validate() {
       [[ $(head -1 "$f") == --- ]] || problems+=("missing frontmatter")
       [[ -n $(fm_get "$f" description) ]] || problems+=("missing description")
       [[ $name =~ ^[a-z0-9][a-z0-9-]*$ ]] || problems+=("name must be lowercase-kebab-case")
+      local desc; desc=$(fm_unquote "$(fm_get "$f" description)")
+      ((${#desc} <= 1024)) || problems+=("description over 1024 chars")
       if [[ $kind == skills ]]; then
         [[ $(fm_unquote "$(fm_get "$f" name)") == "$name" ]] || problems+=("frontmatter name must equal directory name")
+        # Agent Skills spec: only these top-level keys are portable across tools
+        local key; while read -r key; do
+          [[ " name description license compatibility metadata allowed-tools " == *" $key "* ]] \
+            || problems+=("non-portable top-level key '$key' (move it under metadata)")
+        done < <(awk 'NR==1{next} /^---[[:space:]]*$/{exit} /^[A-Za-z_-]+:/{sub(/:.*/,""); print}' "$f")
+        [[ ${desc,,} == *"use when"* ]] || warns+=("skills/$name: description has no 'Use when …' trigger; agents may never load it")
       fi
       if ((${#problems[@]})); then
         errs=$((errs + 1)); warn "$kind/$name: $(IFS=';'; echo "${problems[*]}")"
       fi
+      # skills and workflows share the slash-command namespace in Claude Code
+      [[ $kind != agents ]] && { [[ " $seen " == *" $name "* ]] && { errs=$((errs + 1)); warn "'$name' is both a skill and a workflow; they collide as /$name"; }; seen+=" $name"; }
     done < <(items "$kind")
   done
-  ((errs == 0)) && info "catalog OK" || die "$errs item(s) with problems"
+  local w; for w in "${warns[@]}"; do warn "$w"; done
+  ((errs == 0)) && info "catalog OK${warns[*]:+ (with ${#warns[@]} warning(s))}" || die "$errs problem(s) found"
 }
 
 cmd_new() {
@@ -212,16 +223,31 @@ cmd_new() {
     skill) cat >"$dest" <<EOF
 ---
 name: $name
-description: What this skill does and WHEN to use it. The agent reads this to decide whether to load the skill.
+description: <What it does, third person>. Use when <specific trigger conditions>.
 ---
 
 # ${name}
 
+## Overview
+One or two sentences: what this does and why it matters.
+
 ## When to use
+- <trigger>
+- **Not** for <exclusion>
 
 ## Steps
-
 1.
+
+## Common rationalizations
+| Rationalization | Reality |
+|---|---|
+| "<excuse for skipping a step>" | <why it's wrong> |
+
+## Red flags
+- <sign the skill is being ignored>
+
+## Verification
+- [ ] <exit criterion with evidence>
 EOF
     ;;
     agent) cat >"$dest" <<EOF
