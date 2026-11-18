@@ -56,6 +56,7 @@ available_targets() { local f; for f in "$AK_HOME"/lib/targets/*.sh; do basename
 CONFIG_FILE=$AK_HOME/agentkit.conf
 TARGETS="claude" SCOPE="global" PROJECT_DIR="" KINDS="skills agents workflows"
 ONLY="" EXCLUDE="" WITH="" LINK_SKILLS=0
+GRAPHIFY=${GRAPHIFY:-1}   # 1 = also run `npx graphifyy install` (provides the /graphify skill the explorer uses)
 
 # pick up --config before loading, so flags still override the file
 args=("$@")
@@ -163,6 +164,18 @@ run_targets() {
 }
 
 # --- commands --------------------------------------------------------------
+# setup_graphify — install the external /graphify skill via npx (non-fatal)
+setup_graphify() {
+  ((GRAPHIFY)) || return 0
+  printf '\n%sgraphify%s\n' "$C_B" "$C_0"
+  if ((AK_DRY_RUN)); then info "would run: npx --yes graphifyy install"; return 0; fi
+  if ! command -v npx >/dev/null 2>&1; then
+    warn "npx not found; skipping graphify (install Node.js, or set GRAPHIFY=0)"; return 0
+  fi
+  if npx --yes graphifyy install; then info "graphify installed"
+  else warn "'npx graphifyy install' failed; the explorer will fall back to grep/glob"; fi
+}
+
 cmd_list() {
   local kind name path
   for kind in $KIND_LIST; do
@@ -339,13 +352,14 @@ ONLY="$ONLY_IN"       # blank = everything in the catalog
 EXCLUDE="$EX_IN"
 WITH="$WITH_IN"       # optional items to include
 LINK_SKILLS=$L       # 1 = symlink skills to the catalog
+GRAPHIFY=$GRAPHIFY       # 1 = run \`npx graphifyy install\` on install
 EOF
   info "wrote $CONFIG_FILE"
 }
 
 case $CMD in
   list) cmd_list ;;
-  install) AK_ACTION=install run_targets ;;
+  install) AK_ACTION=install run_targets; setup_graphify ;;
   uninstall) AK_ACTION=uninstall run_targets ;;
   status) AK_ACTION=status run_targets ;;
   validate) cmd_validate ;;

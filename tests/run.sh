@@ -7,7 +7,7 @@ pass=0 fail=0
 
 sandbox() {
   SB=$(mktemp -d); export HOME=$SB XDG_CONFIG_HOME=$SB/.config
-  unset CLAUDE_CONFIG_DIR CODEX_HOME GEMINI_HOME
+  unset CLAUDE_CONFIG_DIR CODEX_HOME GEMINI_HOME; export GRAPHIFY=0
 }
 ok()   { pass=$((pass + 1)); printf '  ok   %s\n' "$1"; }
 bad()  { fail=$((fail + 1)); printf '  FAIL %s\n' "$1"; }
