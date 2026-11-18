@@ -92,9 +92,9 @@ opencode_primary_agent: true      # workflows only: also install as an OpenCode 
 | `test-writer` | writes new tests and failing regression tests (test files only) |
 | `test-runner` | runs the existing suite and fixes broken tests |
 | `code-reviewer` | reviews the diff (read-only) |
-| `pen-tester` | **optional** security audit and safe confirmation against local or authorized targets only. Install with `-w pen-tester` |
+| `pen-tester` | **on demand only**: security audit and safe confirmation against local or authorized targets. Not used by `/master` or any workflow; ask for it directly ("use the pen-tester on the auth module", or `@pen-tester` in OpenCode) |
 
-**Master orchestrator.** `/master <task>` works out what kind of task it is and maps the relevant code. It plans, asking for your approval when the work is large or risky. It then hands each phase to the agents above, reviews the result at most 3 times, adds a security pass when one is needed, and reports.
+**Master orchestrator.** `/master <task>` works out what kind of task it is and maps the relevant code. It plans, asking for your approval when the work is large or risky. It then hands each phase to the agents above, reviews the result at most 3 times, and reports.
 It's a workflow rather than an agent because Claude Code subagents can't start other subagents, so the orchestrator has to run in the main conversation.
 - Claude Code: `/master add rate limiting to the login endpoint`
 - OpenCode: `/master …`, or press Tab to switch to the `master` primary agent

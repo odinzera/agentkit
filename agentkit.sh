@@ -33,7 +33,7 @@ ${C_B}Options:${C_0}
   -k, --kinds LIST         Limit to: skills,agents,workflows
   -o, --only LIST          Only these item names (comma-separated)
   -x, --exclude LIST       Skip these item names
-  -w, --with LIST          Also install these optional items (e.g. pen-tester)
+  -w, --with LIST          Also install these optional items
   -l, --link               Symlink skills instead of copying (edits in the catalog go live)
   -f, --force              Replace files not managed by agentkit (originals are backed up)
   -n, --dry-run            Show what would happen
@@ -45,7 +45,7 @@ ${C_B}Examples:${C_0}
   ./agentkit.sh install -t claude,opencode -n      # preview for two tools
   ./agentkit.sh install -p ~/code/app -k skills    # only skills, into one project
   ./agentkit.sh install -o code-reviewer,feature   # just two items
-  ./agentkit.sh install -w pen-tester              # everything + the optional pen-tester
+  ./agentkit.sh install -w my-optional-item        # everything + an item marked optional: true
   ./agentkit.sh uninstall -t all
 EOF
 }
@@ -309,7 +309,7 @@ PROJECT_DIR=""        # used when SCOPE=project (blank = current dir)
 KINDS="$k"
 ONLY="$ONLY_IN"       # blank = everything in the catalog
 EXCLUDE="$EX_IN"
-WITH="$WITH_IN"       # optional items to include (e.g. pen-tester)
+WITH="$WITH_IN"       # optional items to include
 LINK_SKILLS=$L       # 1 = symlink skills to the catalog
 EOF
   info "wrote $CONFIG_FILE"
